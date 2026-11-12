@@ -28,9 +28,10 @@ System({
     type: "converter",
     desc: "Converts Photo or video to sticker",
 }, async (message, match) => {
-   if (!(message.image || message.video || message.reply_message.video || message.reply_message.image)) return await message.reply("_Reply to photo or video_"); 
-   let media = (message.video || message.image)? message.msg : message.quoted? message.reply_message.msg : null;  
-   let buff = await message.downloadMediaMessage(media);
+   if (!(message.document || message.image || message.video || message.reply_message.video || message.reply_message.image || message.reply_message.document)) return await message.reply("_Reply to document/photo/video_"); 
+   let media = (message.video || message.image || message.document)? message : message.quoted? message.reply_message : null;  
+   let { buff, mime } = await message.client.save(media);
+   if (!mime.startsWith('image/') && !mime.startsWith('video/')) return await message.reply('*Only images and videos are supported !*');  
    return await message.send(buff, { packname: stickerPackNameParts[0], author: stickerPackNameParts[1] }, "sticker");
 });
 
@@ -40,15 +41,14 @@ System({
     desc: "get exif data",
     type: "converter",
 }, async (message, match) => {
-   if (!message.reply_message || !message.reply_message.sticker) return await message.reply("_Reply to sticker_");
-   let img = new Image();
-   await img.load(await message.reply_message.download());
-   const exif = JSON.parse(img.exif.slice(22).toString());
-   const stickerPackId = exif['sticker-pack-id'];
-   const stickerPackName = exif['sticker-pack-name'];
-   const stickerPackPublisher = exif['sticker-pack-publisher'];
-   const cap = (`*Sticker Pack ID -->* ${stickerPackId}\n\n*Pack name -->* ${stickerPackName}\n\n*Publisher Name -->* ${stickerPackPublisher}`)
-   return await message.reply(cap);
+    if (!message.reply_message || !message.reply_message.sticker) return await message.reply("_Reply to sticker_");
+    const img = new Image();
+    await img.load(await message.reply_message.download());
+    if (!img.exif) return await message.reply("_No sticker pack info found_");
+    const str = img.exif.toString("utf8");
+    const json = str.slice(str.indexOf("{"), str.lastIndexOf("}") + 1);
+    let exif; try { exif = JSON.parse(json); } catch { return await message.reply("_Can't read this sticker's pack info_"); };
+    return await message.reply(`*Sticker Pack ID -->* ${exif["sticker-pack-id"] || "N/A"}\n\n*Pack name -->* ${exif["sticker-pack-name"] || "N/A"}\n\n*Publisher Name -->* ${exif["sticker-pack-publisher"] || "N/A"}`);
 });
 
 System({
@@ -58,6 +58,7 @@ System({
     type: "converter",
 }, async (message, match) => {
    let data;
+   if (message.quoted && message.reply_message.type === 'lottieStickerMessage') return message.reply('*Lottie sticker not support*');
    if (!message.quoted || (!message.reply_message.sticker && !message.reply_message.audio)) return await message.reply("_Reply to a sticker or audio_");
    if (message.reply_message.sticker) {
     const stickerPackName = (match || config.STICKER_PACKNAME).split(";");
@@ -78,6 +79,7 @@ System({
     desc: "Sticker to Image",
     type: "converter",
 }, async (message) => {
+   if (message.quoted && message.reply_message.type === 'lottieStickerMessage') return message.reply('*Lottie sticker not support*');
    if (!message.reply_message?.sticker) return await message.reply("_Reply to a sticker_");
    if (message.reply_message.isAnimatedSticker) return await message.reply("_Reply to a non-animated sticker message_");
    let buffer = await webpToPng(await message.reply_message.downloadAndSave());
@@ -90,6 +92,7 @@ System({
     desc: "Changes sticker to Gif",
     type: "converter",
 }, async (message) => {
+   if (message.quoted && message.reply_message.type === 'lottieStickerMessage') return message.reply('*Lottie sticker not support*');
    if (!message.reply_message?.sticker) return await message.reply("_Reply to a sticker_");
    if (!message.reply_message.isAnimatedSticker) return await message.reply("_Reply to an animated sticker message_");
    const buffer = await webp2mp4(await message.reply_message.download());
@@ -102,9 +105,10 @@ System({
     desc: "Make circle photo or sticker",
     type: "converter",
 }, async (message) => {
+   if (message.quoted && message.reply_message.type === 'lottieStickerMessage') return message.reply('*Lottie sticker not support*');
    if (!(message.image || message.reply_message.sticker || message.reply_message.image)) return await message.reply("_*Reply to photo or sticker*_");
    if (message.reply_message.isAnimatedSticker) return await message.reply("_Reply to a non-animated sticker message_");
-   let media = await message.downloadMediaMessage(message.image ? message : message.quoted ? message.reply_message : null);
+   let media = await message.downloadMediaMessage(message.image ? message : message.quoted? message.reply_message : null);
    if(message.image || message.reply_message.image) {
     return await message.send(await cropToCircle(media), {}, 'image');
    };
@@ -117,6 +121,7 @@ System({
     desc: "crop image or sticker",
     type: "converter",
 }, async (message) => {
+   if (message.quoted && message.reply_message.type === 'lottieStickerMessage') return message.reply('*Lottie sticker not support*');
    if (!(message.image || message.reply_message.sticker || message.reply_message.image)) return await message.reply("_*Reply to photo or sticker*_");
    if (message.reply_message.isAnimatedSticker) return await message.reply("_Reply to a non-animated sticker message_");
    if(message.image || message.reply_message.image) {
